@@ -1,11 +1,11 @@
 import math
 import random
+import threading
 from collections import namedtuple, deque
 
 import numpy as np
 import torch.optim as optim
-from torch import device
-
+from window import Window
 from environment import Environment
 import torch
 import torch.nn as nn
@@ -78,146 +78,158 @@ class DQN(nn.Module):
         return masked_q
 
 
-# BATCH_SIZE is the number of transitions sampled from the replay buffer
-# GAMMA is the discount factor as mentioned in the previous section
-# EPS_START is the starting value of epsilon
-# EPS_END is the final value of epsilon
-# EPS_DECAY controls the rate of exponential decay of epsilon, higher means a slower decay
-# TAU is the update rate of the target network
-# LR is the learning rate of the ``AdamW`` optimizer
-BATCH_SIZE = 128
-GAMMA = 0.99
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 1000
-TAU = 0.005
-LR = 1e-4
+class DQN_Training:
 
-env = Environment(8, 12, 5)
-
-# Get number of actions from gym action space
-n_actions = env.action_space.n
-# Get the number of state observations
-state, info = env.reset()
-n_observations = len(state)
-
-policy_net = DQN(n_actions)
-target_net = DQN(n_actions)
-target_net.load_state_dict(policy_net.state_dict())
-
-optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-memory = ReplayMemory(10000)
+    def __init__(self):
+        self.window = Window(8)
+        self.env = Environment(8, 12, 5, self.window)
+        t1 = threading.Thread(target=self.train())
+        t1.start()
 
 
-steps_done = 0
+
+    def train(self):
+
+        # BATCH_SIZE is the number of transitions sampled from the replay buffer
+        # GAMMA is the discount factor as mentioned in the previous section
+        # EPS_START is the starting value of epsilon
+        # EPS_END is the final value of epsilon
+        # EPS_DECAY controls the rate of exponential decay of epsilon, higher means a slower decay
+        # TAU is the update rate of the target network
+        # LR is the learning rate of the ``AdamW`` optimizer
+        BATCH_SIZE = 128
+        GAMMA = 0.99
+        EPS_START = 0.9
+        EPS_END = 0.05
+        EPS_DECAY = 1000
+        TAU = 0.005
+        LR = 1e-4
 
 
-def select_action(obs):
-    global steps_done
-    sample = random.random()
-    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-        math.exp(-1. * steps_done / EPS_DECAY)
-    steps_done += 1
-    if sample > eps_threshold:
-        with torch.no_grad():
-            # t.max(1) will return the largest column value of each row.
-            # second column on max result is index of where max element was
-            # found, so we pick action with the larger expected reward.
-            q_values = policy_net(obs)
-            return torch.argmax(q_values).item()
-    else:
-        valid_actions = np.where(obs["action_mask"] == 1)[0]
-        return np.random.choice(valid_actions)
 
-def optimize_model():
-    if len(memory) < BATCH_SIZE:
-        return
+        # Get number of actions from gym action space
+        n_actions = env.action_space.n
+        # Get the number of state observations
+        state, info = env.reset()
+        n_observations = len(state)
 
-    transitions = memory.sample(BATCH_SIZE)
-    # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
-    # detailed explanation). This converts batch-array of Transitions
-    # to Transition of batch-arrays.
-    batch = Transition(*zip(*transitions))
+        policy_net = DQN(n_actions)
+        target_net = DQN(n_actions)
+        target_net.load_state_dict(policy_net.state_dict())
 
-    # Compute a mask of non-final states and concatenate the batch elements
-    # (a final state would've been the one after which simulation ended)
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                            batch.next_state)), dtype=torch.bool)
-    non_final_next_states = torch.cat([s for s in batch.next_state
-                                       if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
-
-    # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-    # columns of actions taken. These are the actions which would've been taken
-    # for each batch state according to policy_net
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
-
-    # Compute V(s_{t+1}) for all next states.
-    # Expected values of actions for non_final_next_states are computed based
-    # on the "older" target_net; selecting their best reward with max(1).values
-    # This is merged based on the mask, such that we'll have either the expected
-    # state value or 0 in case the state was final.
-    next_state_values = torch.zeros(BATCH_SIZE)
-    with torch.no_grad():
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
-    # Compute the expected Q values
-    expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-
-    # Compute Huber loss
-    criterion = nn.SmoothL1Loss()
-    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1)) # can also use nn.MSELoss
-
-    # Optimize the model
-    optimizer.zero_grad()
-    loss.backward()
-    # In-place gradient clipping
-    torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
-    optimizer.step()
+        optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
+        memory = ReplayMemory(10000)
 
 
-num_episodes = 50
+        steps_done = 0
 
-for i_episode in range(num_episodes):
 
-    obs = env.reset()
-    done = False
+        def select_action(obs):
+            global steps_done
+            sample = random.random()
+            eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+                math.exp(-1. * steps_done / EPS_DECAY)
+            steps_done += 1
+            if sample > eps_threshold:
+                with torch.no_grad():
+                    # t.max(1) will return the largest column value of each row.
+                    # second column on max result is index of where max element was
+                    # found, so we pick action with the larger expected reward.
+                    q_values = policy_net(obs)
+                    return torch.argmax(q_values).item()
+            else:
+                valid_actions = np.where(obs["action_mask"] == 1)[0]
+                return np.random.choice(valid_actions)
 
-    while not done:
+        def optimize_model():
+            if len(memory) < BATCH_SIZE:
+                return
 
-        actions = {}
+            transitions = memory.sample(BATCH_SIZE)
+            # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
+            # detailed explanation). This converts batch-array of Transitions
+            # to Transition of batch-arrays.
+            batch = Transition(*zip(*transitions))
 
-        for agent in env.agents:
-            agent_obs = {
-                "observations": torch.FloatTensor(obs[agent]["observations"]),
-                "action_mask": torch.FloatTensor(obs[agent]["action_mask"])
-            }
-            actions[agent] = select_action(agent_obs)
+            # Compute a mask of non-final states and concatenate the batch elements
+            # (a final state would've been the one after which simulation ended)
+            non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
+                                                    batch.next_state)), dtype=torch.bool)
+            non_final_next_states = torch.cat([s for s in batch.next_state
+                                               if s is not None])
+            state_batch = torch.cat(batch.state)
+            action_batch = torch.cat(batch.action)
+            reward_batch = torch.cat(batch.reward)
 
-        next_obs, rewards, terminated, truncated, info = env.step(actions)
+            # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
+            # columns of actions taken. These are the actions which would've been taken
+            # for each batch state according to policy_net
+            state_action_values = policy_net(state_batch).gather(1, action_batch)
 
-        for agent in env.agents:
-            memory.push(obs[agent]["observations"], actions[agent], next_obs[agent]["observations"], rewards[agent])
+            # Compute V(s_{t+1}) for all next states.
+            # Expected values of actions for non_final_next_states are computed based
+            # on the "older" target_net; selecting their best reward with max(1).values
+            # This is merged based on the mask, such that we'll have either the expected
+            # state value or 0 in case the state was final.
+            next_state_values = torch.zeros(BATCH_SIZE)
+            with torch.no_grad():
+                next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
+            # Compute the expected Q values
+            expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
-        for agent in env.agents:
-            if terminated[agent]:
-                env.agents.remove(agent)
+            # Compute Huber loss
+            criterion = nn.SmoothL1Loss()
+            loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1)) # can also use nn.MSELoss
 
-        obs = next_obs
+            # Optimize the model
+            optimizer.zero_grad()
+            loss.backward()
+            # In-place gradient clipping
+            torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+            optimizer.step()
 
-        optimize_model()
 
-        # Soft update of the target network's weights
-        # θ′ ← τ θ + (1 −τ )θ′
-        target_net_state_dict = target_net.state_dict()
-        policy_net_state_dict = policy_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
-        target_net.load_state_dict(target_net_state_dict)
+        num_episodes = 50
 
-        if all(list(truncated.values())):
-            done = True
+        for i_episode in range(num_episodes):
+
+            obs = env.reset()
+            done = False
+
+            while not done:
+
+                actions = {}
+
+                for agent in env.agents:
+                    agent_obs = {
+                        "observations": torch.FloatTensor(obs[agent]["observations"]),
+                        "action_mask": torch.FloatTensor(obs[agent]["action_mask"])
+                    }
+                    actions[agent] = select_action(agent_obs)
+
+                next_obs, rewards, terminated, truncated, info = env.step(actions)
+
+                for agent in env.agents:
+                    memory.push(obs[agent]["observations"], actions[agent], next_obs[agent]["observations"], rewards[agent])
+
+                for agent in env.agents:
+                    if terminated[agent]:
+                        env.agents.remove(agent)
+
+                obs = next_obs
+
+                optimize_model()
+
+                # Soft update of the target network's weights
+                # θ′ ← τ θ + (1 −τ )θ′
+                target_net_state_dict = target_net.state_dict()
+                policy_net_state_dict = policy_net.state_dict()
+                for key in policy_net_state_dict:
+                    target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
+                target_net.load_state_dict(target_net_state_dict)
+
+                if all(list(truncated.values())):
+                    done = True
 
 
 

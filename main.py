@@ -12,7 +12,9 @@ from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.tune import register_env
 import ray
 from environment import Environment
+from reinforcement_learning import DQN_Training
 from window import Window
+import tkinter as tk
 from pettingzoo.test import parallel_api_test
 #from stable_baselines3 import PPO
 #from stable_baselines3.ppo import MlpPolicy
@@ -27,13 +29,18 @@ import torch.nn as nn
 
 def main():
 
-    window = Window(8)
+
+
+    #window = Window(8)
     env = Environment(8, 12, 5, window)
+   # env.reset()
+    #window.start_mainloop()
+    dqn = DQN_Training()
 
-    t1 = threading.Thread(target=parallel_api_test, args=(env,))
-    t1.start()
+    #t1 = threading.Thread(target=dqn.train(), args=(env,))
+    #t1.start()
 
-    window.start_mainloop()
+    #window.start_mainloop()
     #parallel_api_test(env)
 
 
