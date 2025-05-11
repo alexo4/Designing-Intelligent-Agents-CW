@@ -2,15 +2,7 @@
 import threading
 
 from gym import spaces
-from ray.rllib.connectors.env_to_module import FlattenObservations
-from ray.rllib.core.rl_module import RLModule, RLModuleSpec
-from ray.rllib.core.rl_module.default_model_config import DefaultModelConfig
-from ray.rllib.core.rl_module.torch import TorchRLModule
-from ray.rllib.env.wrappers.pettingzoo_env import PettingZooEnv, ParallelPettingZooEnv
-from ray.rllib.models import ModelCatalog
-from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
-from ray.tune import register_env
-import ray
+
 from environment import Environment
 from reinforcement_learning import DQN_Training
 from window import Window
@@ -19,8 +11,7 @@ from pettingzoo.test import parallel_api_test
 #from stable_baselines3 import PPO
 #from stable_baselines3.ppo import MlpPolicy
 #import supersuit as ss
-from ray.rllib.algorithms.ppo import PPOConfig
-from ray import tune
+
 import numpy as np
 from math import floor
 import torch
@@ -32,10 +23,11 @@ def main():
 
 
     #window = Window(8)
-    env = Environment(8, 12, 5, window)
+    #env = Environment(8, 12, 5, window)
    # env.reset()
     #window.start_mainloop()
     dqn = DQN_Training()
+    dqn.train()
 
     #t1 = threading.Thread(target=dqn.train(), args=(env,))
     #t1.start()

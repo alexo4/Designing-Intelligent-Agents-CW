@@ -8,7 +8,6 @@ from math import sqrt
 import numpy as np
 from gymnasium.spaces.space import Space
 from pettingzoo.utils.env import AgentID
-from ray.rllib.env.multi_agent_env import MultiAgentEnv
 import player
 from square import Square
 import gym
@@ -35,31 +34,25 @@ class Environment(ParallelEnv):
         self.time = 0
         self.total_possession_time = 10
         self.possession_time = 10
-        self.inner_action_space = spaces.Discrete(5 + floor(players_count / 2))
         self.possible_agents = list(range(0, players_count))
         self.agents = copy(self.possible_agents)
         self.window = window
         self.render_mode = None
-
-        self.inner_observation_space = spaces.Dict(
-            {
-                "observation": spaces.Dict({
-                    "court": spaces.Box(low=0, high=1, shape=(self.grid_size * 2, self.grid_size, 4), dtype=np.int64),
-                #    "self_info": spaces.Box(low=0, high=self.grid_size*2, shape=(8,), dtype=np.int64),
-                    "team_info": spaces.Box(low=0, high=1, shape=(floor(len(self.players) / 2), 2), dtype=np.int64),
-                    "global_info": spaces.Box(low=0, high=self.total_time, shape=(2,), dtype=np.int64),
-                }),
-                "action_mask": spaces.Box(0, 1, shape=(11,), dtype=np.int8),
-            }
-        )
+        court_size = 16 * 8 * 4  # grid_height * grid_width * channels
+        team_size = len(self.players) * 1
+        global_size = 2
+        total_size = court_size + team_size + global_size
 
         self.observation_spaces = {
-            agent_id: self.inner_observation_space for agent_id in self.agents
+            agent_id: spaces.Box(low=0, high=1, shape=(total_size,), dtype=np.float32)
+            for agent_id in self.agents
         }
 
         self.action_spaces = {
-            agent_id: self.inner_action_space for agent_id in self.agents
+            agent_id: spaces.Discrete(5 + floor(players_count / 2))
+            for agent_id in self.agents
         }
+
 
 
 
@@ -101,7 +94,7 @@ class Environment(ParallelEnv):
         self.initialise_balls(red_balls, player_count, len(self.court) - 1)
         self.get_players()
         #t1 = threading.Thread(target=self.solve)
-        self.window.initialise_players(self.court)
+        #self.window.initialise_players(self.court)
         print("done")
         #self.observation_space.sample()
 
@@ -190,33 +183,61 @@ class Environment(ParallelEnv):
         
         '''
         global_info = np.zeros(2)
-        global_info[0] = self.time
+        global_info[0] = self.time / self.total_time
 
         majority = self.ball_majority()
         if player.get_team() == "blue_team":
             if majority == 1:
-                global_info[1] = self.possession_time
+                global_info[1] = self.possession_time / self.total_possession_time
             else:
-                global_info[1] = self.total_possession_time
+                global_info[1] = self.total_possession_time / self.total_possession_time
         else:
             if majority == 1:
-                global_info[1] = self.total_possession_time
+                global_info[1] = self.total_possession_time / self.total_possession_time
             else:
-                global_info[1] = self.possession_time
+                global_info[1] = self.possession_time / self.total_possession_time
 
         team_info = np.zeros((floor(len(self.players) / 2), 2))
         blue_team_alive = self.get_players_alive(0)
         red_team_alive = self.get_players_alive(1)
 
-        team_info = {
+        blue_team = np.zeros(floor(len(self.players) / 2))
+        for i in range(blue_team_alive):
+            blue_team[i] = 1
 
-            "teammates": blue_team_alive if player.get_team() == "blue" else red_team_alive,
-            "opponents": blue_team_alive if player.get_team() == "red" else red_team_alive
-        }
+        red_team = np.zeros(floor(len(self.players) / 2))
+        for i in range(red_team_alive):
+            red_team[i] = 1
+
+        team_info_1 = blue_team if player.get_team() == "blue" else red_team
+        team_info_2 = blue_team if player.get_team() == "red" else red_team
+
+
+        team_info = np.concatenate((team_info_1, team_info_2), axis=0)
+        all_info = np.concatenate((encoded_court.flatten(), team_info, global_info), axis=0)
 
         observation = ([encoded_court, team_info, global_info])
+       # print(observation)
+        return all_info
 
-        return observation
+    def get_masked_observations(self):
+
+        observations = {}
+
+        for agent in self.agents:
+            observation = self.get_observation(self.players[agent])
+            action_mask = self.get_action_mask(self.players[agent])
+
+            observation_mask = {
+                agent: {
+                    "observation": observation,
+                    "action_mask": action_mask,
+                }
+            }
+            observations.update(observation_mask)
+        #print(observations[0])
+        return observations
+
 
     def step(self, actions):
 
@@ -254,7 +275,7 @@ class Environment(ParallelEnv):
 
             if throw_rewards[i] == -1:
                 terminated[i] = True
-                self.window.remove_player(self.players[self.agents[i]].get_name())
+                #self.window.remove_player(self.players[self.agents[i]].get_name())
                 print(self.agents[i])
                 #self.agents.remove(self.agents[i])
                 remove.append(self.agents[i])
@@ -266,40 +287,28 @@ class Environment(ParallelEnv):
 
         rewards_dict = dict(zip(players_name, rewards))
 
-        observations = {}
-        infos = {}
-        truncations = {}
-        i = 0
-
-        for player in players_name:
-            observation = self.get_observation(self.players[player])
-            action_mask = self.get_action_mask(self.players[player])
-
-            observation_mask = {
-                player:{
-                    "observation": observation,
-                    "action_mask": action_mask,
-                }
-            }
-
-            observations.update(observation_mask)
-            info = {player: {}}
-            infos.update(info)
-            #truncation = {player: False}
-           #truncations.update(truncation)
+        #observations = self.get_masked_observations()
+        infos = dict((name, {}) for name in self.agents)
 
         if self.agents[0] >= floor(len(self.players) / 2) or self.agents[len(self.agents) - 1] < floor(len(self.players) / 2):
             truncations = dict((name,True) for name in players_name)
         else:
             truncations = dict((name, False) for name in players_name)
 
+        observations = {}
+        action_masks = {}
+        for agent in self.agents:
+            observation = {agent: self.get_observation(self.players[agent])}
+            observations.update(observation)
+            action_mask = {agent: self.get_action_mask(self.players[agent])}
+            action_masks.update(action_mask)
 
 
         #observations_dict = dict(zip(players_name, observations))
         terminated_dict = dict(zip(players_name, terminated))
-        self.window.update_balls()
+        #self.window.update_balls()
 
-        time.sleep(3)
+        #time.sleep(3)
         '''  for i in range(0,len(self.court)):
             for j in range(0,len(self.court[0])):
                 if self.court[i][j].get_player() is not None:
@@ -309,7 +318,10 @@ class Environment(ParallelEnv):
             print("\n")
 
         '''
-        return [observations, rewards_dict, terminated_dict, truncations, infos]
+
+        #self.window.render(self)
+
+        return [observations, rewards_dict, terminated_dict, truncations, infos, action_masks]
 
 
     def do_action(self, action, player, agent):
@@ -348,15 +360,16 @@ class Environment(ParallelEnv):
             old_square.set_balls(0)
 
 
-            if old_x != new_x:
-                self.window.update_player(agent, (new_x - old_x), 0)
-            else:
-                self.window.update_player(agent, 0, (new_y - old_y))
+           # if old_x != new_x:
+           #     self.window.update_player(agent, (new_x - old_x), 0)
+          #  else:
+          #      self.window.update_player(agent, 0, (new_y - old_y))
 
 
     def get_action_mask(self, player):
 
         action_mask = [1] * (5 + floor(len(self.players) / 2))
+        action_mask = np.ones(11, dtype=np.int8)
 
         if player.get_y() == (self.grid_size * 2) - 1:
             action_mask[1] = 0
@@ -528,26 +541,19 @@ class Environment(ParallelEnv):
         self.initialise_court()
         self.agents = copy(self.possible_agents)
 
+        #observations = self.get_masked_observations()
         observations = {}
-
-        i = 0
-        for player in self.players:
-            observation = self.get_observation(player)
-            action_mask = self.get_action_mask(player)
-
-            observation_mask = {
-                self.agents[i]: {
-                    "observation": observation,
-                    "action_mask": action_mask,
-                }
-            }
-           # print(self.agents[i])
-            observations.update(observation_mask)
-            i += 1
+        action_masks = {}
+        for agent in self.agents:
+            observation = {agent: self.get_observation(self.players[agent])}
+            observations.update(observation)
+            action_mask = {agent: self.get_action_mask(self.players[agent])}
+            action_masks.update(action_mask)
 
         print("RESET")
-        infos = {a: {} for a in self.agents}
-        return observations, infos
+        infos = dict((name, {}) for name in self.agents)
+
+        return observations, action_masks
 
     def get_players_alive(self, team):
         count = 0
@@ -579,8 +585,7 @@ class Environment(ParallelEnv):
 
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
-  #      print(self.observation_spaces[agent])
- #       print(isinstance(self.observation_spaces[agent], Space))
+
         return self.observation_spaces[agent]
 
 

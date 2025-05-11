@@ -40,7 +40,7 @@ class Window:
     def initialise_players(self, court):
 
         self.court = court
-
+        print("init court")
         for cv_object in self.objects.values():
             self.canvas.delete(cv_object)
 
@@ -121,6 +121,12 @@ class Window:
                                        196 + y_offset + (self.square_size * y) + 10,
                                        fill="green", tag='balls')
 
+    def render(self, env):
+        print("render")
+        self.canvas.create_text(300 + (self.square_size * 200) + self.square_size - 4,
+                                196 + 8 + (self.square_size * 300) + 6, text=str(5), font='Helvetica 30 bold',
+                                tag='balls')
+        self.draw_balls(100, 100, 1, 1)
 
     def start_mainloop(self):
         self.root.mainloop()
