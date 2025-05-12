@@ -28,11 +28,11 @@ def main():
     #env = Environment(8, 12, 5, window)
    # env.reset()
     #window.start_mainloop()
-    test = Testing()
-    test.game(test.model_RAND, test.model_DQN, 100)
+  #  test = Testing()
+  #  test.game(test.model_RAND, test.model_DQN, 500)
 
-  #  dqn = DQN_Training()
-   # dqn.train()
+    dqn = DQN_Training()
+    dqn.train()
 
   #  ppo = PPO_Training()
   #  ppo.train()

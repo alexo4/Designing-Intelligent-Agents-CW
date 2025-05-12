@@ -119,7 +119,7 @@ class PPO_Training:
         BATCH_SIZE = 64
         LR = 3e-4
 
-        obs_size = 782
+        obs_size = 784
         action_size = 11
 
         policy_net = PPO(action_size, obs_size)

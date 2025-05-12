@@ -1,4 +1,5 @@
 import math
+import pickle
 import queue
 import random
 import threading
@@ -58,15 +59,15 @@ class DQN(nn.Module):
         )
 
         grid_size = 768
-        global_info = 2
+        global_info = 4
         team_info = 12
         total_input = grid_size + global_info + team_info
         self.fc_combined = nn.Sequential(
             nn.Linear(total_input, 256),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.Linear(256, 256),
             nn.ReLU(),
-            nn.Linear(128, n_actions)
+            nn.Linear(256, n_actions)
 
         )
 
@@ -107,7 +108,7 @@ class DQN_Training:
         # EPS_DECAY controls the rate of exponential decay of epsilon, higher means a slower decay
         # TAU is the update rate of the target network
         # LR is the learning rate of the ``AdamW`` optimizer
-        BATCH_SIZE = 256
+        BATCH_SIZE = 512
         GAMMA = 0.99
         EPS_START = 0.9
         EPS_END = 0.05
@@ -127,7 +128,7 @@ class DQN_Training:
         target_net.load_state_dict(policy_net.state_dict())
 
         optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-        memory = ReplayMemory(10000)
+        memory = ReplayMemory(50000)
 
 
 
@@ -145,8 +146,11 @@ class DQN_Training:
                     # found, so we pick action with the larger expected reward.
 
                     q_values = policy_net(obs)
+                 #   q_values[torch.tensor(action_mask) == 0] = -1e9
+                #    action = q_values.argmax().item()
                     masked_q = q_values + torch.log(torch.from_numpy(action_mask).float() + 1e-8)
                     return torch.argmax(masked_q).item()
+                 #   return action
             else:
                 valid_actions = np.where(action_mask == 1)[0]
                 return np.random.choice(valid_actions)
@@ -169,16 +173,16 @@ class DQN_Training:
             )
 
             non_final_next_states = torch.stack([
-                torch.FloatTensor(s)  # Convert each list to tensor first
+                torch.FloatTensor(np.array([s]))  # Convert each list to tensor first
                 for s in batch.next_state
-                if s is not None  # Only include non-terminal states
+                if s is not None  # Only include non-terminal states CHECK THIS
             ])
 
             state_batch = torch.cat([
-                      torch.Tensor([s])
+                      torch.Tensor(np.array([s]))
                      for s in batch.state
             ])
-
+           # state_batch = torch.tensor(np.array(batch.state), dtype=torch.float32)
 
             action_batch = torch.cat([
                 torch.LongTensor([a])
@@ -204,7 +208,10 @@ class DQN_Training:
             next_state_values = torch.zeros(BATCH_SIZE)
             with torch.no_grad():
                 next_q_values = target_net(non_final_next_states).squeeze(1)
+               # print(next_q_values)
                 max_next_q_values = next_q_values.max(1)[0]
+                max_next_q_values = max_next_q_values.max(1)[0]
+               # print(max_next_q_values)
                 next_state_values[non_final_mask] = max_next_q_values
             # Compute the expected Q values
             expected_state_action_values = (next_state_values * GAMMA) + reward_batch
@@ -217,11 +224,12 @@ class DQN_Training:
             optimizer.zero_grad()
             loss.backward()
             # In-place gradient clipping
-            torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+            torch.nn.utils.clip_grad_norm_(policy_net.parameters(), max_norm=1.0)
             optimizer.step()
 
         steps_done = 0
-        num_episodes = 100
+        num_episodes = 10000
+        rewards_list =[]
 
         for i_episode in range(num_episodes):
 
@@ -246,7 +254,8 @@ class DQN_Training:
 
                 next_obs, rewards, terminated, truncated, action_masks = self.env.step(actions)
 
-                print("rewards:", rewards)
+           #     print("rewards:", rewards)
+                rewards_list.append(sum(rewards.values()))
                 '''
                 for agent in self.env.agents:
 
@@ -259,9 +268,7 @@ class DQN_Training:
 
                 for agent in self.env.agents:
                     memory.push(
-                        [
-                            obs[agent]
-                        ],
+                        [obs[agent]],
                         actions[agent],
                         None if terminated[agent] else [
                             next_obs[agent]
@@ -269,9 +276,10 @@ class DQN_Training:
                         rewards[agent]
                     )
 
-                for agent in self.env.agents:
-                    if terminated[agent]:
-                        self.env.agents.remove(agent)
+                self.env.agents = [agent for agent in self.env.agents if not terminated[agent]]
+               # for agent in self.env.agents:
+               #     if terminated[agent]:
+               #         self.env.agents.remove(agent)
 
                 obs = next_obs
 
@@ -289,7 +297,9 @@ class DQN_Training:
                     done = True
 
         # Save the model
-        torch.save(policy_net.state_dict(), 'DQN.pth')
+        torch.save(policy_net.state_dict(), 'DQN4.pth')
+        with open('rewards4.pkl', 'wb') as f:
+            pickle.dump(rewards_list, f)
 
 
 
