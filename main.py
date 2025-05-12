@@ -4,7 +4,9 @@ import threading
 from gym import spaces
 
 from environment import Environment
-from reinforcement_learning import DQN_Training
+from deep_q_learning import DQN_Training
+from proximal_policy_optimization import PPO_Training
+from testing import Testing
 from window import Window
 import tkinter as tk
 from pettingzoo.test import parallel_api_test
@@ -26,8 +28,14 @@ def main():
     #env = Environment(8, 12, 5, window)
    # env.reset()
     #window.start_mainloop()
-    dqn = DQN_Training()
-    dqn.train()
+    test = Testing()
+    test.game(test.model_RAND, test.model_DQN, 100)
+
+  #  dqn = DQN_Training()
+   # dqn.train()
+
+  #  ppo = PPO_Training()
+  #  ppo.train()
 
     #t1 = threading.Thread(target=dqn.train(), args=(env,))
     #t1.start()

@@ -33,12 +33,13 @@ class Environment(ParallelEnv):
         self.total_time = 300
         self.time = 0
         self.total_possession_time = 10
-        self.possession_time = 10
+        self.possession_time_blue = 10
+        self.possession_time_red = 10
         self.possible_agents = list(range(0, players_count))
         self.agents = copy(self.possible_agents)
         self.window = window
         self.render_mode = None
-        court_size = 16 * 8 * 4  # grid_height * grid_width * channels
+        court_size = 16 * 8 * 6  # grid_height * grid_width * channels
         team_size = len(self.players) * 1
         global_size = 2
         total_size = court_size + team_size + global_size
@@ -60,7 +61,8 @@ class Environment(ParallelEnv):
 
         self.court = [[Square(0, None) for _ in range(self.grid_size)] for _ in range(self.grid_size * 2)]
         self.time = self.total_time
-        self.possession_time = self.total_possession_time
+        self.possession_time_blue = self.total_possession_time
+        self.possession_time_red = self.total_possession_time
 
         player_count = floor(len(self.players) / 2)
         step = (self.grid_size - 1) / (player_count - 1)
@@ -95,8 +97,6 @@ class Environment(ParallelEnv):
         self.get_players()
         #t1 = threading.Thread(target=self.solve)
         #self.window.initialise_players(self.court)
-        print("done")
-        #self.observation_space.sample()
 
 
     def initialise_balls(self, balls, player_count, row):
@@ -127,7 +127,7 @@ class Environment(ParallelEnv):
     def get_observation(self, player):
 
         #self.get_players()
-        channels = 4
+        channels = 6
         encoded_court = np.zeros((self.grid_size * 2, self.grid_size, channels), dtype=int)
         encoded_court[player.get_y()][player.get_x()][0] = 1
 
@@ -135,6 +135,8 @@ class Environment(ParallelEnv):
             for j in range(self.grid_size):
 
                 cur_square = self.court[i][j]
+                encoded_court[i][j][4] = j / (self.grid_size - 1)
+                encoded_court[i][j][5] = j / ((self.grid_size * 2) - 1)
 
                 if cur_square.get_player() is not None:
                     if cur_square.get_player().get_alive():
@@ -145,57 +147,16 @@ class Environment(ParallelEnv):
 
                 if cur_square.get_balls() > 0:
                     encoded_court[i][j][3] = 1
-        '''
-        self_info = np.zeros(8)
-        self_info[0] = player.get_x()
-        self_info[1] = player.get_y()
-        self_info[2] = player.get_alive()
-        if player.get_team() == "blue":
-            self_info[3] = 0
-        else:
-            self_info[3] = 1
-        self_info[4] = player.get_throw_cooldown()
-        self_info[5] = player.get_move_cooldown()
-        self_info[6] = player.get_dodge_cooldown()
-        self_info[7] = player.get_incoming_ball()
 
-        team_info = np.zeros((floor(len(self.players) / 2), 4))
-
-        team_offset = 0
-        if player.get_team() == "red":
-            team_offset = floor(len(self.players) / 2)
-
-        for i in range(team_offset, team_offset + floor(len(self.players) / 2)):
-            teammate = self.players[i]
-            team_info[0] = teammate.get_x()
-            team_info[1] = teammate.get_y()
-            team_info[2] = teammate.get_alive()
-
-            if self.court[teammate.get_y()][teammate.get_x()].get_balls() > 0:
-                team_info[3] = 1
-
-
-        global_info = np.zeros(4)
-        global_info[0] = self.get_players_alive(0)
-        global_info[1] = self.get_players_alive(1)
-        global_info[2] = self.time
-        global_info[3] = self.possession_time
-        
-        '''
         global_info = np.zeros(2)
         global_info[0] = self.time / self.total_time
 
         majority = self.ball_majority()
         if player.get_team() == "blue_team":
-            if majority == 1:
-                global_info[1] = self.possession_time / self.total_possession_time
-            else:
-                global_info[1] = self.total_possession_time / self.total_possession_time
+            global_info[1] = self.possession_time_blue / self.total_possession_time
+
         else:
-            if majority == 1:
-                global_info[1] = self.total_possession_time / self.total_possession_time
-            else:
-                global_info[1] = self.possession_time / self.total_possession_time
+            global_info[1] = self.possession_time_red / self.total_possession_time
 
         team_info = np.zeros((floor(len(self.players) / 2), 2))
         blue_team_alive = self.get_players_alive(0)
@@ -217,7 +178,6 @@ class Environment(ParallelEnv):
         all_info = np.concatenate((encoded_court.flatten(), team_info, global_info), axis=0)
 
         observation = ([encoded_court, team_info, global_info])
-       # print(observation)
         return all_info
 
     def get_masked_observations(self):
@@ -235,27 +195,16 @@ class Environment(ParallelEnv):
                 }
             }
             observations.update(observation_mask)
-        #print(observations[0])
         return observations
 
 
     def step(self, actions):
 
-        print("step")
         rewards = [0] * len(actions)
         terminated = [False] * len(actions)
 
         players_name = list(actions.keys())
-        #self.get_players()
 
-        '''for i in range(0,len(self.court)):
-            for j in range(0,len(self.court[0])):
-                if self.court[i][j].get_player() is not None:
-                    print("0",end=" ")
-                else:
-                    print("X",end=" ")
-            print("\n")
-            '''
         i = 0
         throw_objects = []
         
@@ -273,27 +222,98 @@ class Environment(ParallelEnv):
 
         for i in range(0, len(throw_rewards)):
 
-            if throw_rewards[i] == -1:
+            if throw_rewards[i] == -3:
                 terminated[i] = True
                 #self.window.remove_player(self.players[self.agents[i]].get_name())
-                print(self.agents[i])
                 #self.agents.remove(self.agents[i])
                 remove.append(self.agents[i])
 
             if throw_rewards[i] != 0:
                 rewards[i] += throw_rewards[i]
 
-       # self.agents = list(set(self.agents) - set(remove))
 
+        players_out = []
+        if self.ball_majority() == 1:
+            self.possession_time_blue -= 1
+            if self.possession_time_blue <= 0:
+                self.possession_time_blue = 10
+                players_out = self.get_ball_holders(0)
+                i = 0
+                for agent in self.agents:
+                    if agent > 6:
+                        break
+                    else:
+                        rewards[i] -= 3
+
+            #    print("out: ", players_out)
+        else:
+            self.possession_time_red -= 1
+            if self.possession_time_red <= 0:
+                self.possession_time_red = 10
+                players_out = self.get_ball_holders(1)
+                i = 0
+                for agent in self.agents:
+                    if agent >= 6:
+                        rewards[i] -= 3
+
+               # print("out: ", players_out)
+
+
+        for p in players_out:
+        #    print(rewards[self.agents.index(p)])
+            index = self.agents.index(p)
+            self.players[p].set_alive(0)
+            self.court[self.players[p].get_y()][self.players[p].get_x()].set_player(None)
+            rewards[self.agents.index(p)] = -3
+            terminated[self.agents.index(p)] = True
+        #    print(rewards[self.agents.index(p)])
+
+        remove.extend(players_out)
+        players_left = list(set(self.agents) - set(remove))
+        players_left.sort()
+        print(players_left)
         rewards_dict = dict(zip(players_name, rewards))
 
         #observations = self.get_masked_observations()
         infos = dict((name, {}) for name in self.agents)
 
-        if self.agents[0] >= floor(len(self.players) / 2) or self.agents[len(self.agents) - 1] < floor(len(self.players) / 2):
-            truncations = dict((name,True) for name in players_name)
+        if len(players_left) > 0:
+
+
+            if players_left[0] >= floor(len(self.players) / 2) or players_left[len(players_left) - 1] < floor(len(self.players) / 2):
+                truncations = dict((name,True) for name in players_name)
+                print(self.agents)
+                print(remove)
+                print(players_left)
+                for p in players_left:
+                    rewards_dict[p] = 5
+
+            else:
+                truncations = dict((name, False) for name in players_name)
+
         else:
             truncations = dict((name, False) for name in players_name)
+
+        self.time -= 1
+
+        if self.time == 0:
+            truncations = dict((name, True) for name in players_name)
+            blue = 0
+            red = 0
+            for agent in self.agents:
+                if self.players[agent].get_team() == "blue":
+                    blue += 1
+                else:
+                    red += 1
+
+            for agent in self.agents:
+                if blue == red:
+                    rewards_dict[agent] += 5
+                elif self.players[agent].get_team() == "blue":
+                    rewards_dict[agent] += 5 if blue > red else red > blue -5
+                else:
+                    rewards_dict[agent] += 5 if red > blue else blue > red -5
+
 
         observations = {}
         action_masks = {}
@@ -308,40 +328,27 @@ class Environment(ParallelEnv):
         terminated_dict = dict(zip(players_name, terminated))
         #self.window.update_balls()
 
-        #time.sleep(3)
-        '''  for i in range(0,len(self.court)):
-            for j in range(0,len(self.court[0])):
-                if self.court[i][j].get_player() is not None:
-                    print("0",end=" ")
-                else:
-                    print("X",end=" ")
-            print("\n")
-
-        '''
-
         #self.window.render(self)
 
-        return [observations, rewards_dict, terminated_dict, truncations, infos, action_masks]
+        return [observations, rewards_dict, terminated_dict, truncations, action_masks]
 
 
     def do_action(self, action, player, agent):
 
-        #print(str(player.get_x()) + " " + str(player.get_y()))
-        #print(str(action) + " action")
         if action == 0:
-            return 0
+            return 0.2
         if action == 1:
             self.move_player(player, player.get_x(), player.get_y(), player.get_x(), player.get_y()+1, agent)
-            return 0.5
+            return 0.2
         elif action == 2:
             self.move_player(player, player.get_x(), player.get_y(), player.get_x(), player.get_y() - 1, agent)
-            return 0.5
+            return 0.2
         elif action == 3:
             self.move_player(player, player.get_x(), player.get_y(), player.get_x() + 1, player.get_y(), agent)
-            return 0.2
+            return 0.1
         elif action == 4:
             self.move_player(player, player.get_x(), player.get_y(), player.get_x() - 1, player.get_y(), agent)
-            return 0.2
+            return 0.1
      #   elif action >= 5 & action < 5 + floor(len(self.players) / 2):
      #       self.throw_ball(player, action - 5)
 
@@ -433,11 +440,9 @@ class Environment(ParallelEnv):
     def do_throws(self, throws):
 
         throws_grouped = []
-        print(throws)
 
         for i in range(0, len(throws)):
             same = False
-            print(i)
             for j in range(0, len(throws_grouped)):
                 if throws_grouped[j][0].get_target() == throws[i].get_target():
                     throws_grouped[j].append(throws[i])
@@ -451,23 +456,24 @@ class Environment(ParallelEnv):
 
         for i in range(0, len(throws_grouped)):
 
-
+            if throws_grouped[i][0] is None:
+                continue
+            if throws_grouped[i][0].get_thrower().get_team() == "blue":
+                self.possession_time_blue = 10
+            else:
+                self.possession_time_red = 10
 
             chance = self.calc_hit_chance(throws_grouped[i])
-            print(str(chance) + " chance")
+
             rand = random.uniform(0,1)
             target = throws_grouped[i][0].get_target()
             square = self.court[target.get_y()][target.get_x()]
             hit = False
             if rand <= chance:
                 hit = True
-                print("hit")
-                rewards[self.agents.index(int(target.get_name()))] = -1
+                rewards[self.agents.index(int(target.get_name()))] = -3
                 target.set_alive(0)
                 square.set_player(None)
-                print(self.agents)
-                print(target.get_name())
-                #self.agents.remove(int(target.get_name()))
 
             square.set_balls(square.get_balls() + len(throws_grouped[i]))
 
@@ -475,14 +481,12 @@ class Environment(ParallelEnv):
                 thrower = throws_grouped[i][j].get_thrower()
                 square = self.court[thrower.get_y()][thrower.get_x()]
                 square.set_balls(square.get_balls() - 1)
-                print(self.agents)
-                print(thrower.get_name())
 
-                if rewards[self.agents.index(int(thrower.get_name()))] != -1:
+                if rewards[self.agents.index(int(thrower.get_name()))] != -3:
                     if hit:
-                        rewards[self.agents.index(int(thrower.get_name()))] = 1
+                        rewards[self.agents.index(int(thrower.get_name()))] = 3
                     else:
-                        rewards[self.agents.index(int(thrower.get_name()))] = -0.5
+                        rewards[self.agents.index(int(thrower.get_name()))] = -0.4
 
         return rewards
 
@@ -496,7 +500,6 @@ class Environment(ParallelEnv):
 
         for i in range(0, len(throws)):
             cur_dist = self.dist_two_players(throws[i].get_target(), throws[i].get_thrower())
-            print(str(cur_dist) + " dist")
             if cur_dist < dist:
                 dist = cur_dist
 
@@ -550,7 +553,6 @@ class Environment(ParallelEnv):
             action_mask = {agent: self.get_action_mask(self.players[agent])}
             action_masks.update(action_mask)
 
-        print("RESET")
         infos = dict((name, {}) for name in self.agents)
 
         return observations, action_masks
@@ -562,6 +564,21 @@ class Environment(ParallelEnv):
             if self.players[i + team * floor(len(self.players) / 2)].get_alive():
                 count += 1
         return count
+
+
+    def get_ball_holders(self, team):
+
+        players = []
+
+        for i in range(team, self.grid_size * (team + 1)):
+            for j in range(self.grid_size):
+                cur_square = self.court[i][j]
+                if cur_square.get_player() is not None:
+                    if cur_square.get_balls() > 0:
+                        players.append(int(cur_square.get_player().get_name()))
+
+        return players
+
 
     def ball_majority(self):
 
