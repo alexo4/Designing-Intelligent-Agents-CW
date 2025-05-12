@@ -30,7 +30,7 @@ class Environment(ParallelEnv):
         self.grid_size = grid_size
         self.players = [Player] * players_count
         self.balls = balls
-        self.total_time = 300
+        self.total_time = 100
         self.time = 0
         self.total_possession_time = 10
         self.possession_time_blue = 10
@@ -67,19 +67,19 @@ class Environment(ParallelEnv):
         player_count = floor(len(self.players) / 2)
         step = (self.grid_size - 1) / (player_count - 1)
 
-        for i in range (player_count):
+        for i in range(player_count):
 
-            #Team Blue
+            # Team Blue
             x_b = floor(i * step)
             y_b = 0
-            player = Player(str(i),x_b, y_b, "blue")
-            self.court[0][floor(i * step)].set_player(player)
+            new_player1 = Player(str(i),x_b, y_b, "blue")
+            self.court[0][floor(i * step)].set_player(new_player1)
 
             # Team Red
             x_r = floor(i * step)
             y_r = (self.grid_size * 2) - 1
-            player = Player(str(i + player_count), x_r, y_r, "red")
-            self.court[len(self.court) - 1][floor(i * step)].set_player(player)
+            new_player2 = Player(str(i + player_count), x_r, y_r, "red")
+            self.court[len(self.court) - 1][floor(i * step)].set_player(new_player2)
 
         if self.balls % 2 == 0:
             blue_balls = floor(self.balls / 2)
@@ -264,7 +264,7 @@ class Environment(ParallelEnv):
 
         for p in players_out:
         #    print(rewards[self.agents.index(p)])
-            index = self.agents.index(p)
+#            index = self.agents.index(p)
             self.players[p].set_alive(0)
             self.court[self.players[p].get_y()][self.players[p].get_x()].set_player(None)
             rewards[self.agents.index(p)] = -3
@@ -281,6 +281,7 @@ class Environment(ParallelEnv):
         infos = dict((name, {}) for name in self.agents)
 
         if len(players_left) > 0:
+            #print("left ",players_left)
 
             if players_left[0] >= floor(len(self.players) / 2) or players_left[len(players_left) - 1] < floor(len(self.players) / 2):
                 truncations = dict((name,True) for name in players_name)
@@ -310,11 +311,14 @@ class Environment(ParallelEnv):
 
             for agent in self.agents:
                 if blue == red:
-                    rewards_dict[agent] += 5
+                    rewards_dict[agent] -= 5
+                    print("draw")
                 elif self.players[agent].get_team() == "blue":
-                    rewards_dict[agent] += 5 if blue > red else red > blue -5
+                    print("blue ",players_left)
+                    rewards_dict[agent] -= 5 if blue > red else red > blue -5
                 else:
-                    rewards_dict[agent] += 5 if red > blue else blue > red -5
+                    print("red ",players_left)
+                    rewards_dict[agent] -= 5 if red > blue else blue > red -5
 
 
         observations = {}
@@ -338,8 +342,9 @@ class Environment(ParallelEnv):
     def do_action(self, action, player, agent):
 
         reward = 0.0
+
         if action == 0:
-            return -0.05
+            return -0.5
         if action == 1:
             reward = self.move_player(player, player.get_x(), player.get_y(), player.get_x(), player.get_y()+1, agent)
             if self.court[player.get_y()][player.get_x()].get_balls() > 0:
@@ -372,7 +377,7 @@ class Environment(ParallelEnv):
             old_square.set_player(None)
             new_square.set_player(player)
             if new_square.get_balls() > 0:  # increases reward for picking up ball
-                reward = 0.4
+                reward = 0.8
             new_square.set_balls(old_square.get_balls() + new_square.get_balls())
             old_square.set_balls(0)
         return reward
@@ -390,7 +395,7 @@ class Environment(ParallelEnv):
         action_mask = [1] * (5 + floor(len(self.players) / 2))
         action_mask = np.ones(11, dtype=np.int8)
 
-        if player.get_y() == (self.grid_size * 2) - 1:
+        if player.get_y() >= (self.grid_size * 2) - 1:
             action_mask[1] = 0
 
         elif ((self.court[player.get_y() + 1][player.get_x()].get_player() is not None) |
@@ -405,7 +410,7 @@ class Environment(ParallelEnv):
               (floor(player.get_y() / self.grid_size)) != (floor((player.get_y() - 1) / self.grid_size))):
             action_mask[2] = 0
 
-        if player.get_x() == self.grid_size - 1:
+        if player.get_x() >= self.grid_size - 1:
             action_mask[3] = 0
         elif self.court[player.get_y()][player.get_x() + 1].get_player() is not None:
             action_mask[3] = 0
@@ -454,8 +459,12 @@ class Environment(ParallelEnv):
         throws_grouped = []
 
         for i in range(0, len(throws)):
+            if throws[i] is None:
+                continue
             same = False
             for j in range(0, len(throws_grouped)):
+                if throws_grouped[j][0] is None:
+                    continue
                 if throws_grouped[j][0].get_target() == throws[i].get_target():
                     throws_grouped[j].append(throws[i])
                     same = True
@@ -496,9 +505,9 @@ class Environment(ParallelEnv):
 
                 if rewards[self.agents.index(int(thrower.get_name()))] != -3:
                     if hit:
-                        rewards[self.agents.index(int(thrower.get_name()))] = 3
+                        rewards[self.agents.index(int(thrower.get_name()))] = 10
                     else:
-                        rewards[self.agents.index(int(thrower.get_name()))] = -0.5
+                        rewards[self.agents.index(int(thrower.get_name()))] = -0.2
 
         return rewards
 

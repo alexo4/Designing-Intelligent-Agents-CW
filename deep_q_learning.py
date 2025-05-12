@@ -108,7 +108,7 @@ class DQN_Training:
         # EPS_DECAY controls the rate of exponential decay of epsilon, higher means a slower decay
         # TAU is the update rate of the target network
         # LR is the learning rate of the ``AdamW`` optimizer
-        BATCH_SIZE = 512
+        BATCH_SIZE = 128
         GAMMA = 0.99
         EPS_START = 0.9
         EPS_END = 0.05
@@ -228,7 +228,7 @@ class DQN_Training:
             optimizer.step()
 
         steps_done = 0
-        num_episodes = 10000
+        num_episodes = 5000
         rewards_list =[]
 
         for i_episode in range(num_episodes):

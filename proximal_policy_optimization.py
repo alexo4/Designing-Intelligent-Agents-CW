@@ -98,7 +98,7 @@ class PPO (nn.Module):
         logits = logits + torch.log(torch.from_numpy(action_mask).float() + 1e-8)
         dist = torch.distributions.Categorical(logits=logits)
         action = dist.sample()
-        print(action)
+        #print(action)
         return action, dist.log_prob(action), dist.entropy(), value
 
 
@@ -151,10 +151,13 @@ class PPO_Training:
 
 
         # steps_done = 0
-        num_updates = 2
+        num_updates = 100
         obs, action_masks = self.env.reset()
 
         for i_update in range(1, num_updates+1):
+
+            print("update: ", i_update)
+            obs, action_masks = self.env.reset()
 
             for t in range(TIME):
 
@@ -168,6 +171,8 @@ class PPO_Training:
 
                     agent_obs = torch.tensor(obs[agent], dtype=torch.float32)
                     action_mask = action_masks[agent]
+                    #print("loc ",self.env.players[agent].get_x()," " ,self.env.players[agent].get_y())
+                    print(len(self.env.agents))
                     actions[agent], logprobs[agent], entropies[agent], values[agent] = (
                             policy_net.select_action_and_value(agent_obs, action_mask))
 
@@ -189,11 +194,14 @@ class PPO_Training:
 
                 obs = next_obs
 
-                for agent in self.env.agents:
-                    if terminated[agent]:
-                        self.env.agents.remove(agent)
+              #  for agent in self.env.agents:
+             #       if terminated[agent]:
+             #           self.env.agents.remove(agent)
 
-                if all(list(truncated.values())):
+                self.env.agents = [agent for agent in self.env.agents if not terminated[agent]]
+
+                if all(list(truncated.values())) or len(self.env.agents) == 0:
+                    print("end")
                     obs, action_masks = self.env.reset()
 
 
@@ -207,8 +215,6 @@ class PPO_Training:
             truncated = data["truncated"]
             terminated = data["terminated"]
 
-            print("hi")
-
             last_values = {}
             for agent in self.env.agents:
                 agent_obs = torch.tensor(obs[agent], dtype=torch.float32)
@@ -216,11 +222,8 @@ class PPO_Training:
                 with torch.no_grad():
                     _,_,_, last_values[agent] = policy_net.select_action_and_value(agent_obs, action_mask)
 
-            print(type([last_values]))
-            print(last_values)
             last_values = torch.tensor([last_values[agent] for agent in self.env.agents], dtype=torch.float32)
-            print(type([last_values]))
-            print(last_values)
+
             values = torch.cat([values, last_values], dim=0)
 
             advantages = torch.zeros_like(rewards)
@@ -257,5 +260,5 @@ class PPO_Training:
 
 
         # Save the model
-        torch.save(policy_net.state_dict(), 'PPO.pth')
+        torch.save(policy_net.state_dict(), 'PPO2.pth')
 

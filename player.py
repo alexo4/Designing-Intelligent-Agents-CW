@@ -24,13 +24,13 @@ class Player:
         return self.x
 
     def set_x(self, x):
-        self.x = x
+        self.x = abs(x)
 
     def get_y(self):
         return self.y
 
     def set_y(self, y):
-        self.y = y
+        self.y = abs(y)
 
     def get_throw_cooldown(self):
         return self.throw_cooldown

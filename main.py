@@ -28,14 +28,14 @@ def main():
     #env = Environment(8, 12, 5, window)
    # env.reset()
     #window.start_mainloop()
-  #  test = Testing()
-  #  test.game(test.model_RAND, test.model_DQN, 500)
+   # test = Testing()
+  #  test.game(test.model_RAND, test.model_PPO, 500)
 
-    dqn = DQN_Training()
-    dqn.train()
+  #  dqn = DQN_Training()
+ #   dqn.train()
 
-  #  ppo = PPO_Training()
-  #  ppo.train()
+    ppo = PPO_Training()
+    ppo.train()
 
     #t1 = threading.Thread(target=dqn.train(), args=(env,))
     #t1.start()
@@ -58,7 +58,7 @@ def model(window):
     env = Environment(8, 12, 5, window)
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     #env = ss.concat_vec_env_v1(env, 1, base_class="stable_baselines3")
-
+`
     model = PPO(
         MlpPolicy,
         env,
