@@ -354,12 +354,12 @@ class Environment(ParallelEnv):
         if action == 1:
             reward = self.move_player(player, player.get_x(), player.get_y(), player.get_x(), player.get_y()+1, agent)
             if self.court[player.get_y()][player.get_x()].get_balls() > 0:
-                reward += 0.1
+                reward += 0.3
             return 0.1 + reward
         elif action == 2:
             reward = self.move_player(player, player.get_x(), player.get_y(), player.get_x(), player.get_y() - 1, agent)
             if self.court[player.get_y()][player.get_x()].get_balls() == 0:
-                reward += 0.1
+                reward += 0.3
             return 0.1 + reward
         elif action == 3:
             reward = self.move_player(player, player.get_x(), player.get_y(), player.get_x() + 1, player.get_y(), agent)
@@ -383,7 +383,7 @@ class Environment(ParallelEnv):
             old_square.set_player(None)
             new_square.set_player(player)
             if new_square.get_balls() > 0:  # increases reward for picking up ball
-                reward = 0.5
+                reward = 1.2
             new_square.set_balls(old_square.get_balls() + new_square.get_balls())
             old_square.set_balls(0)
         return reward
@@ -515,7 +515,7 @@ class Environment(ParallelEnv):
                     if hit:
                         rewards[self.agents.index(int(thrower.get_name()))] = 5
                     else:
-                        rewards[self.agents.index(int(thrower.get_name()))] = -0.4
+                        rewards[self.agents.index(int(thrower.get_name()))] = -0.5
 
         return rewards
 
@@ -526,39 +526,56 @@ class Environment(ParallelEnv):
         max_dist = (self.grid_size * 2) - 1
         balls = len(throws)
         dist = self.grid_size * 3
+        has_ball = False
+
 
         for i in range(0, len(throws)):
-            cur_dist = self.dist_two_players(throws[i].get_target(), throws[i].get_thrower())
+            cur_dist, has_ball = self.dist_two_players(throws[i].get_target(), throws[i].get_thrower())
             if cur_dist < dist:
                 dist = cur_dist
 
 
         if dist <= floor(max_dist * 0.3):
-            return 1
+            chance =  0.8
+            if has_ball:
+                chance -= 0.2
+            return chance
 
         if dist <= floor(max_dist * 0.4):
+            chance = 0.7
             if balls > 1:
-                return 0.9
-       #     return 1
-            return 0.8
+                chance += 0.1
+            if has_ball:
+                chance -= 0.2
+            return chance
 
         if dist <= ceil(max_dist * 0.5):
+            chance = 0.6
             if balls > 1:
-                return 0.6 * (1.1 ** balls)
-          #  return 1
-            return 0.6
+                chance = chance * (1.1 ** balls)
+            if has_ball:
+                chance -= 0.3
+            return chance
 
         if dist <= floor(max_dist * 0.7):
+            chance = 0.4
             if balls > 1:
-                return 0.4 * (1.1 ** balls)
-            return 0.4
+                chance = chance * (1.1 ** balls)
+            if has_ball:
+                chance -= 0.3
+            return chance
 
         if dist <= floor(max_dist * 0.8):
+            chance = 0.3
             if balls > 1:
-                return 0.3 * (1.1 ** balls)
-            return 0.3
+                chance = chance * (1.1 ** balls)
+            if has_ball:
+                chance -= 0.2
+            return chance
 
         if dist <= floor(max_dist * 0.9):
+            if has_ball:
+                return 0
             if balls > 1:
                 return 0.1 * (1.1 ** balls)
             return 0.1
@@ -568,7 +585,11 @@ class Environment(ParallelEnv):
 
     def dist_two_players(self, player1, player2):
 
-        return floor(sqrt( abs(player1.get_x() - player2.get_x()) ** 2 + abs(player1.get_y() - player2.get_y()) ** 2 ))
+        has_ball = False
+        if self.court[player1.get_y()][player1.get_x()].get_balls() > 0:
+            has_ball = True
+
+        return floor(sqrt( abs(player1.get_x() - player2.get_x()) ** 2 + abs(player1.get_y() - player2.get_y()) ** 2 )), has_ball
 
 
     def reset(self, seed=None, options=None):

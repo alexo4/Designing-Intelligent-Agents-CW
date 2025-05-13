@@ -228,7 +228,7 @@ class DQN_Training:
             optimizer.step()
 
         steps_done = 0
-        num_episodes = 1000
+        num_episodes = 10000
         rewards_list =[]
 
         for i_episode in range(num_episodes):
@@ -237,6 +237,7 @@ class DQN_Training:
 
             print("episode:", i_episode)
             done = False
+            rewards_total = 0
 
 
             while not done:
@@ -255,7 +256,7 @@ class DQN_Training:
                 next_obs, rewards, terminated, truncated, action_masks = self.env.step(actions)
 
            #     print("rewards:", rewards)
-                rewards_list.append(sum(rewards.values()))
+                rewards_total += sum(rewards.values())
                 '''
                 for agent in self.env.agents:
 
@@ -295,6 +296,8 @@ class DQN_Training:
 
                 if all(list(truncated.values())):
                     done = True
+
+            rewards_list.append(rewards_total)
 
         # Save the model
         torch.save(policy_net.state_dict(), 'DQN7.pth')
