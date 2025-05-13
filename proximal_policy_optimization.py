@@ -1,4 +1,5 @@
 import math
+import pickle
 import queue
 import random
 import threading
@@ -119,7 +120,7 @@ class PPO_Training:
         BATCH_SIZE = 64
         LR = 3e-4
 
-        obs_size = 784
+        obs_size = 658
         action_size = 11
 
         policy_net = PPO(action_size, obs_size)
@@ -151,13 +152,15 @@ class PPO_Training:
 
 
         # steps_done = 0
-        num_updates = 50
+        num_updates = 30
         obs, action_masks = self.env.reset()
+        rewards_list =[]
 
         for i_update in range(1, num_updates+1):
 
             print("update: ", i_update)
            # obs, action_masks = self.env.reset()
+            rewards_total = 0
 
             for t in range(TIME):
 
@@ -179,6 +182,7 @@ class PPO_Training:
 
                 next_obs, rewards, terminated, truncated, action_masks = self.env.step(actions)
                 print(sum(rewards.values()))
+                rewards_total += sum(rewards.values())
 
 
                 for agent in self.env.agents:
@@ -205,6 +209,7 @@ class PPO_Training:
                     print("end")
                     obs, action_masks = self.env.reset()
 
+            rewards_list.append(rewards_total)
 
             data = buffer.get()
 
@@ -244,4 +249,6 @@ class PPO_Training:
 
         # Save the model
         torch.save(policy_net.state_dict(), 'PPO2.pth')
+        with open('rewards8.pkl', 'wb') as f:
+            pickle.dump(rewards_list, f)
 
