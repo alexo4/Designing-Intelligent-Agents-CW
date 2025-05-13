@@ -114,11 +114,11 @@ class Testing:
 
         if model == self.model_DQN:
             model = DQN(11)
-            model.load_state_dict(torch.load("DQN.pth"))
+            model.load_state_dict(torch.load("DQN6.pth"))
             model.eval()
         elif model == self.model_PPO:
             model = PPO(11, 784)
-            model.load_state_dict(torch.load("PPO.pth"))
+            model.load_state_dict(torch.load("PPO2.pth"))
             model.eval()
 
        # model = DQN(11)

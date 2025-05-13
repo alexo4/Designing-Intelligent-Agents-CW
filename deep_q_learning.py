@@ -58,8 +58,8 @@ class DQN(nn.Module):
             nn.ReLU()
         )
 
-        grid_size = 768
-        global_info = 4
+        grid_size = 640
+        global_info = 6
         team_info = 12
         total_input = grid_size + global_info + team_info
         self.fc_combined = nn.Sequential(
@@ -228,7 +228,7 @@ class DQN_Training:
             optimizer.step()
 
         steps_done = 0
-        num_episodes = 5000
+        num_episodes = 1000
         rewards_list =[]
 
         for i_episode in range(num_episodes):
@@ -297,8 +297,8 @@ class DQN_Training:
                     done = True
 
         # Save the model
-        torch.save(policy_net.state_dict(), 'DQN4.pth')
-        with open('rewards4.pkl', 'wb') as f:
+        torch.save(policy_net.state_dict(), 'DQN7.pth')
+        with open('rewards7.pkl', 'wb') as f:
             pickle.dump(rewards_list, f)
 
 

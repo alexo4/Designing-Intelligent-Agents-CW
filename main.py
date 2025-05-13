@@ -28,15 +28,22 @@ def main():
     #env = Environment(8, 12, 5, window)
    # env.reset()
     #window.start_mainloop()
-   # test = Testing()
-  #  test.game(test.model_RAND, test.model_PPO, 500)
+    #test = Testing()
+   # test.game(test.model_PPO, test.model_RAND, 500)
+   # exit(0)
+    dqn = DQN_Training()
+    dqn.train()
+    exit(0)
 
-  #  dqn = DQN_Training()
- #   dqn.train()
+    for i in range(30):
+        try:
+            ppo = PPO_Training()
+            ppo.train()
+            break
+        except:
+            print("error")
 
-    ppo = PPO_Training()
-    ppo.train()
-
+    print("success")
     #t1 = threading.Thread(target=dqn.train(), args=(env,))
     #t1.start()
 

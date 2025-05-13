@@ -73,9 +73,9 @@ class PPO (nn.Module):
         super().__init__()
 
         self.backbone = nn.Sequential(
-            nn.Linear(obs_size, 128),
+            nn.Linear(obs_size, 256),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(256, 128),
             nn.ReLU(),
         )
 
@@ -151,13 +151,13 @@ class PPO_Training:
 
 
         # steps_done = 0
-        num_updates = 100
+        num_updates = 50
         obs, action_masks = self.env.reset()
 
         for i_update in range(1, num_updates+1):
 
             print("update: ", i_update)
-            obs, action_masks = self.env.reset()
+           # obs, action_masks = self.env.reset()
 
             for t in range(TIME):
 
@@ -172,12 +172,13 @@ class PPO_Training:
                     agent_obs = torch.tensor(obs[agent], dtype=torch.float32)
                     action_mask = action_masks[agent]
                     #print("loc ",self.env.players[agent].get_x()," " ,self.env.players[agent].get_y())
-                    print(len(self.env.agents))
+                 #   print(len(self.env.agents))
                     actions[agent], logprobs[agent], entropies[agent], values[agent] = (
                             policy_net.select_action_and_value(agent_obs, action_mask))
 
 
                 next_obs, rewards, terminated, truncated, action_masks = self.env.step(actions)
+                print(sum(rewards.values()))
 
 
                 for agent in self.env.agents:
@@ -238,25 +239,7 @@ class PPO_Training:
 
             dataset = torch.utils.data.TensorDataset(obs, actions, logprobs, returns, advantages)
             loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
-            for _ in range(EPOCHS):
-                for batch_obs, batch_actions, batch_logprob, batch_returns, batch_advantages in loader:
-                    logits, values = policy_net.forward(batch_obs)
-                    dist = torch.distributions.Categorical(logits=logits)
-                    batch_actions = batch_actions.argmax(dim=1)
-                    new_logprob = dist.log_prob(batch_actions)
-                    entropy = dist.entropy().mean()
-
-                    ratio = torch.exp(new_logprob - batch_logprob)
-                    clip = torch.clamp(ratio, 1 - CLIP, 1 + CLIP) * batch_advantages
-                    policy_loss = -torch.min(ratio * batch_advantages, clip).mean()
-
-                    value_loss = F.mse_loss(values, batch_returns)
-
-                    loss = policy_loss + 0.5 * value_loss - 0.01 * entropy
-
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
+            optimize_model(loader)
 
 
         # Save the model
