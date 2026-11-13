@@ -1,0 +1,9 @@
+[project]
+name = "dodgeball-rl"
+version = "0.2.0"
+description = "Multi-agent dodgeball reinforcement learning environment with DQN and PPO agents"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

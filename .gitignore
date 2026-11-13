@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+.pytest_cache/
+*.py[cod]
+venv/
+.venv/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Training outputs and old artefacts (kept locally, not in git)
+checkpoints/
+runs/
+archive/
+*.pt
+*.pth
+*.pkl
