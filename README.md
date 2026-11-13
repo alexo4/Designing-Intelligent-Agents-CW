@@ -179,12 +179,40 @@ What the experiments show:
 - **Longer training helps a little, then plateaus.** v2 peaks at ~35–40% around 700–1000
   updates and is ~30% at 1500. The agents beat random reliably, but they still lose most games
   against the held-out heuristic.
-- **Mixing didn't help DQN** (single seed, 20k episodes): the final checkpoint fell to 14%
-  against the held-out heuristic. Possibly because the replay buffer mixes experience from
-  many past opponents.
-
 (v2 and v2 at 1500 updates use the same seeds, so their curves are identical for the first
 400 updates, which shows that runs are reproducible.)
+
+### DQN vs PPO at the same budget
+
+Both get 819,200 environment steps (`--env-steps` for DQN), v1 rewards, the same evaluation
+and the same best-checkpoint rule. DQN's replay buffer is 200k transitions, not the 5M default,
+so that 3 runs fit in 8 GB of RAM; this is recorded in each run's `config.json`.
+
+| Config | Seeds | Final: vs random | Final: vs held-out | Best: vs held-out | Best: vs standard heuristic |
+|---|---|---|---|---|---|
+| PPO self-play (v1) | 5 | 91.2% ± 1.8 | 14.4% ± 4.6 | 21.4% ± 6.7 | 27.6% ± 8.0 |
+| PPO + opponent mix | 5 | 87.2% ± 2.6 | **28.6% ± 9.0** | **32.2% ± 3.8** | 31.8% ± 5.6 |
+| DQN self-play | 3 | 88.9% ± 4.9 | 20.2% ± 3.9 | 20.5% ± 12.9 | 24.7% ± 3.8 |
+| DQN + opponent mix | 3 | 81.7% ± 16.5 | 19.3% ± 8.1 | 17.6% ± 3.9 | 28.9% ± 6.2 |
+
+![DQN vs PPO learning curves](results/dqn_vs_ppo.png)
+
+(DQN evaluates every 500 episodes, so its curves stop where the shortest seed's last
+in-training evaluation was, ~0.75M steps. The table's final row is at 0.82M.)
+
+- **With self-play, DQN and PPO are about equal.** DQN's final checkpoint is slightly
+  better against the held-out heuristic (20% vs 14%), but the CIs overlap. It also forgets less
+  between its best and final checkpoints.
+- **Opponent mixing helps PPO but not DQN.** DQN with mixing is no better than DQN self-play,
+  and its best checkpoint is clearly behind PPO with mixing (18% ± 4 vs 32% ± 4). DQN with mixing
+  beats the *standard* heuristic, which it trains against (29%), much more often than the held-out
+  one (18%). So it seems to learn that specific opponent rather than general play. PPO with mixing
+  scores about the same against both. A likely cause: DQN's replay buffer keeps learning from old
+  games against past opponents, while PPO only learns from its latest games.
+- **DQN costs more compute.** It does a gradient step on every environment step: ~1 hour per
+  run alone, versus about the same for PPO with 6 runs in parallel.
+- **Overall, PPO with opponent mixing is the best configuration found.** DQN is no better than
+  PPO at this budget.
 
 ## Usage
 

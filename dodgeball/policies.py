@@ -30,7 +30,9 @@ class HeuristicPolicy:
     Holding a ball:
         throw at the opponent with the best hit chance if it is at least ``min_chance``
         (or at anyone once the possession timer is nearly up), otherwise walk forward to
-        get closer.
+        get closer. At the half-way line it throws anyway, unless ``patient``: then it holds
+        the ball (which also makes it harder to hit) until the shot is good enough or the
+        possession timer forces a throw.
     Not holding a ball:
         walk to the nearest loose ball on our half; if there is none, back away from the
         half-way line when the opponents hold balls, to make their throws less accurate.
@@ -48,11 +50,12 @@ class HeuristicPolicy:
         policy.name = "heuristic_variant"
         return policy
 
-    def __init__(self, grid_size=8, min_chance=0.6, panic_timer=2):
+    def __init__(self, grid_size=8, min_chance=0.6, panic_timer=2, patient=False):
         self.g = grid_size
         self.h = 2 * grid_size
         self.min_chance = min_chance
         self.panic_timer = panic_timer
+        self.patient = patient
 
     def _parse(self, obs):
         grid = obs[:GRID_CHANNELS * self.h * self.g].reshape(GRID_CHANNELS, self.h, self.g)
@@ -89,6 +92,8 @@ class HeuristicPolicy:
             return best_action
         if mask[FORWARD]:
             return FORWARD
+        if self.patient:
+            return STAY
         return best_action if best_action is not None else STAY
 
     def _fetch_or_retreat(self, teammates, balls, my_x, my_y, extra, mask):

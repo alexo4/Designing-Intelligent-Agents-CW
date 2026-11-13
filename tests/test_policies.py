@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from dodgeball.agents import DQN, PPO
-from dodgeball.env import BACK, FORWARD, N_MOVE_ACTIONS, RIGHT, DodgeballEnv
+from dodgeball.env import BACK, FORWARD, N_MOVE_ACTIONS, RIGHT, STAY, DodgeballEnv
 from dodgeball.policies import HeuristicPolicy, NetworkPolicy, RandomPolicy, head_to_head, play_game
 from tests.conftest import set_layout
 
@@ -88,3 +88,14 @@ def test_head_to_head_alternates_sides():
     result = head_to_head(env, RandomPolicy(1), RandomPolicy(2), games=400)
     assert abs(result["win"] - result["loss"]) < 0.15
     assert np.isclose(result["win"] + result["loss"] + result["draw"], 1.0)
+
+
+def test_patient_heuristic_holds_a_bad_shot_at_the_line(env):
+    # At the half-way line (can't move forward), with the only target ~10 squares away (40% shot).
+    set_layout(env, {0: (7, 7), 6: (0, 15)}, balls={(7, 7): 1})
+    env.possession_timer[0] = env.possession_limit
+    obs, mask = env._observe(0), env.action_mask(0)
+    assert HeuristicPolicy(env.grid_size).act(obs, mask) >= N_MOVE_ACTIONS      # throws anyway
+    assert HeuristicPolicy(env.grid_size, patient=True).act(obs, mask) == STAY  # waits
+    env.possession_timer[0] = 1                                                 # ...until forced
+    assert HeuristicPolicy(env.grid_size, patient=True).act(env._observe(0), mask) >= N_MOVE_ACTIONS

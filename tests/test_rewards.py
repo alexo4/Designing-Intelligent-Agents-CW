@@ -217,3 +217,13 @@ def test_head_to_head_reports_behaviour():
     res = head_to_head(env, HeuristicPolicy(), RandomPolicy(0), games=20)
     assert res["throws_per_game"] > 0 and res["pickups_per_game"] >= 0
     assert 0 <= res["idle_frac"] <= 1
+
+
+def test_dqn_stops_after_the_episode_that_reaches_the_step_budget():
+    env = DodgeballEnv()
+    env.reset(seed=0)
+    trainer = seeded(DQNTrainer, env, MEMORY_SIZE=10_000)
+    rewards = trainer.train(10 ** 6, log_every=100, max_env_steps=50)
+    assert trainer.env_steps >= 50
+    assert trainer.env_steps - 50 < env.max_steps          # stopped within one episode
+    assert len(rewards) < 10

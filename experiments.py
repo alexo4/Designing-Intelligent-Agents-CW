@@ -41,9 +41,13 @@ SMOKE = False
 FINAL_SEED = 100_000
 
 # Shared training budget and evaluation settings (don't change between runs).
-BASE = {
-    "algo": "ppo",
-    "args": ["--updates", "400", "--eval-every", "20", "--eval-games", "100", "--threads", "1"],
+# Both budgets are 819,200 environment steps (400 PPO updates x 2048 steps), with an
+# evaluation roughly every 41k steps (20 PPO updates; ~500 DQN episodes of ~83 steps).
+BASE_ARGS = {
+    "ppo": ["--updates", "400", "--eval-every", "20", "--eval-games", "100", "--threads", "1"],
+    # Replay buffer cut from 5M to 200k transitions (~1 GB) so 3 runs fit in 8 GB of RAM.
+    "dqn": ["--env-steps", "819200", "--eval-every", "500", "--eval-games", "100", "--threads", "1",
+            "--hp", "MEMORY_SIZE=200000", "--hp", "EPS_DECAY=1000000"],
 }
 
 # name -> (description, extra train.py arguments). Each is v1 + exactly one change.
@@ -70,7 +74,19 @@ EXPERIMENTS = {
     "v2_long": ("v2 trained for 1500 updates",
                 ["--hp", "P_SELF=0.4", "--hp", "P_PAST=0.3", "--hp", "P_HEURISTIC=0.2", "--hp", "P_RANDOM=0.1",
                  "--reward", "idle=-0.01", "--updates", "1500"]),
+    # DQN with the same 0.82M-step budget and v1 rewards (buffer 200k, see BASE_ARGS["dqn"]).
+    "dqn_self": ("DQN self-play, 0.82M steps, buffer 200k", []),
+    "dqn_mix": ("DQN + opponent mix (as PPO mix), 0.82M steps, buffer 200k",
+                ["--hp", "P_SELF=0.4", "--hp", "P_PAST=0.3", "--hp", "P_HEURISTIC=0.2", "--hp", "P_RANDOM=0.1"]),
 }
+EXPERIMENTS["dqn_mix_buf50k"] = (
+    "dqn_mix with a 50k replay buffer (tests whether stale replay data is why mixing doesn't help DQN)",
+    EXPERIMENTS["dqn_mix"][1] + ["--hp", "MEMORY_SIZE=50000"])   # later --hp wins over BASE_ARGS
+ALGO = {"dqn_self": "dqn", "dqn_mix": "dqn", "dqn_mix_buf50k": "dqn"}   # every other experiment is PPO
+
+
+def algo_of(name):
+    return ALGO.get(name, "ppo")
 
 FIELDS = ["experiment", "description", "algo", "seed", "checkpoint", "iterations", "env_steps",
           "win_random", "win_heuristic", "win_heuristic_variant", "draw_heuristic_variant",
@@ -88,8 +104,10 @@ def use_smoke_settings():
     RESULTS = ROOT / "runs" / "smoke" / "results"
     RESULTS_CSV = RESULTS / "experiments.csv"
     FINAL_GAMES = 20
-    BASE["args"] = ["--updates", "2", "--eval-every", "1", "--eval-games", "10", "--threads", "1",
-                    "--hp", "TIME=256"]
+    BASE_ARGS["ppo"] = ["--updates", "2", "--eval-every", "1", "--eval-games", "10", "--threads", "1",
+                        "--hp", "TIME=256"]
+    BASE_ARGS["dqn"] = ["--env-steps", "300", "--eval-every", "2", "--eval-games", "10", "--threads", "1",
+                        "--hp", "MEMORY_SIZE=5000", "--hp", "BATCH_SIZE=32"]
 
 
 def run_dir(name, seed):
@@ -98,7 +116,8 @@ def run_dir(name, seed):
 
 def train_command(name, seed):
     _, extra = EXPERIMENTS[name]
-    return [sys.executable, "-u", str(ROOT / "train.py"), BASE["algo"], *BASE["args"], *extra,
+    algo = algo_of(name)
+    return [sys.executable, "-u", str(ROOT / "train.py"), algo, *BASE_ARGS[algo], *extra,
             "--seed", str(seed), "--out-dir", str(run_dir(name, seed))]
 
 
@@ -159,7 +178,7 @@ def eval_run(name, seed):
 
     torch.set_num_threads(1)
     d = run_dir(name, seed)
-    algo = BASE["algo"]
+    algo = algo_of(name)
     config = json.loads((d / "config.json").read_text())
     with open(d / f"{algo}_eval.csv") as f:
         last = list(csv.DictReader(f))[-1]
@@ -283,7 +302,7 @@ def plot_curves(names, out):
     for i, name in enumerate(names):
         curves = []
         for d in sorted(RUNS.glob(f"{name}_s*")):
-            path = d / f"{BASE['algo']}_eval.csv"
+            path = d / f"{algo_of(name)}_eval.csv"
             if d.is_dir() and path.exists():
                 with open(path) as f:
                     curves.append(list(csv.DictReader(f)))
@@ -332,7 +351,7 @@ def main():
     p.add_argument("--description", default="")
     p = sub.add_parser("report")
     p.add_argument("names", nargs="*")
-    p.add_argument("--out", type=Path, default=RESULTS / "learning_curves.png")
+    p.add_argument("--out", type=Path, default=None, help="plot path (default: results/learning_curves.png)")
     args = parser.parse_args()
     if args.smoke:
         use_smoke_settings()
@@ -347,7 +366,7 @@ def main():
     elif args.cmd == "eval-checkpoint":
         eval_checkpoint(args.label, args.spec, args.seed, args.description)
     else:
-        report(args.names, args.out)
+        report(args.names, args.out or RESULTS / "learning_curves.png")
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ Examples::
 
     python train.py ppo --updates 300 --seed 0 --out-dir runs/ppo_s0
     python train.py dqn --episodes 3000 --seed 0 --out-dir runs/dqn_s0
+    python train.py dqn --env-steps 819200 --seed 0 --out-dir runs/dqn_s0   # same budget as 400 PPO updates
 
     # override hyperparameters (any upper-case attribute of DQNTrainer / PPOTrainer)
     python train.py ppo --hp LR=1e-4 --hp EPOCHS=8 --seed 0 --out-dir runs/ppo_lr1e-4_s0
@@ -134,6 +135,9 @@ def main():
     parser.add_argument("algo", choices=["dqn", "ppo"])
     parser.add_argument("--episodes", type=int, default=3000, help="DQN: number of training episodes")
     parser.add_argument("--updates", type=int, default=300, help="PPO: number of policy updates")
+    parser.add_argument("--env-steps", type=int, default=None,
+                        help="train for this many environment steps instead (DQN: stops after the episode "
+                             "that reaches it; PPO: rounds up to whole updates). Overrides --episodes/--updates")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--out-dir", type=Path, default=Path("checkpoints"))
     parser.add_argument("--eval-every", type=int, default=None,
@@ -172,9 +176,11 @@ def main():
 
     try:
         if args.algo == "dqn":
-            episode_rewards = trainer.train(args.episodes, callback=evaluator)
+            episodes = args.episodes if args.env_steps is None else 10 ** 9
+            episode_rewards = trainer.train(episodes, callback=evaluator, max_env_steps=args.env_steps)
         else:
-            episode_rewards = trainer.train(args.updates, callback=evaluator)
+            updates = args.updates if args.env_steps is None else -(-args.env_steps // trainer_cls.TIME)
+            episode_rewards = trainer.train(updates, callback=evaluator)
     finally:
         evaluator.close()
 

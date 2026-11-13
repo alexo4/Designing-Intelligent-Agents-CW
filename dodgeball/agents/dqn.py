@@ -157,9 +157,11 @@ class DQNTrainer:
             target_state[key] = policy_state[key] * self.TAU + target_state[key] * (1 - self.TAU)
         self.target_net.load_state_dict(target_state)
 
-    def train(self, num_episodes, log_every=10, callback=None):
+    def train(self, num_episodes, log_every=10, callback=None, max_env_steps=None):
         """Train for ``num_episodes`` and return the total reward of each episode.
 
+        With ``max_env_steps``, training also stops after the first episode that reaches that
+        many environment steps (so DQN and PPO can be given the same budget).
         ``callback(episode)`` is called after every episode (used for periodic evaluation).
         """
         episode_rewards = []
@@ -214,6 +216,9 @@ class DQNTrainer:
                 print(f"episode {i_episode + 1}/{num_episodes}  mean reward (last {log_every}): {recent:.1f}")
             if callback is not None:
                 callback(i_episode + 1)
+            if max_env_steps is not None and self.env_steps >= max_env_steps:
+                print(f"reached {self.env_steps} environment steps after {i_episode + 1} episodes")
+                break
 
         return episode_rewards
 

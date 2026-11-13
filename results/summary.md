@@ -15,6 +15,8 @@ Final evaluation: greedy actions, 500 games per opponent per run, sides alternat
 | mix | opponent mix: 40% self, 30% past, 20% heuristic, 10% random | 5 | 87.2% ± 2.6% | 28.6% ± 9.0% | 30.6% ± 9.8% | 2.2 | 17.1 | 38% |
 | v2 | v2 = mix + idle penalty (400 updates) | 3 | 90.5% ± 4.3% | 27.6% ± 19.4% | 25.3% ± 8.1% | 2.1 | 14.3 | 23% |
 | v2_long | v2 trained for 1500 updates | 3 | 92.0% ± 3.4% | 30.2% ± 5.5% | 29.7% ± 5.5% | 1.8 | 12.8 | 20% |
+| dqn_self | DQN self-play, 0.82M steps, buffer 200k | 3 | 88.9% ± 4.9% | 20.2% ± 3.9% | 18.3% ± 5.0% | 2.2 | 11.9 | 49% |
+| dqn_mix | DQN + opponent mix (as PPO mix), 0.82M steps, buffer 200k | 3 | 81.7% ± 16.5% | 19.3% ± 8.1% | 25.6% ± 2.6% | 2.0 | 10.8 | 24% |
 | v1_dqn_mix20k | DQN 20k, opponent mix 50/25/25 (final) | 1 | 86.2% | 14.2% | 20.0% | 2.2 | 11.1 | 29% |
 | v1_legacy_dqn20k | DQN 20k episodes, self-play (final) | 1 | 90.6% | 23.6% | 23.4% | 2.2 | 11.9 | 26% |
 | v1_legacy_dqn20k_double | Double DQN 20k (final) | 1 | 89.6% | 15.6% | 17.6% | 2.3 | 11.0 | 37% |
@@ -34,6 +36,8 @@ Final evaluation: greedy actions, 500 games per opponent per run, sides alternat
 | mix | opponent mix: 40% self, 30% past, 20% heuristic, 10% random | 5 | 87.4% ± 1.5% | 32.2% ± 3.8% | 31.8% ± 5.6% | 2.1 | 17.0 | 39% |
 | v2 | v2 = mix + idle penalty (400 updates) | 3 | 85.9% ± 2.1% | 31.4% ± 7.7% | 27.7% ± 12.6% | 2.1 | 14.1 | 25% |
 | v2_long | v2 trained for 1500 updates | 3 | 91.9% ± 9.8% | 35.9% ± 6.0% | 35.7% ± 7.1% | 1.9 | 14.1 | 20% |
+| dqn_self | DQN self-play, 0.82M steps, buffer 200k | 3 | 86.5% ± 13.2% | 20.5% ± 12.9% | 24.7% ± 3.8% | 2.0 | 11.4 | 20% |
+| dqn_mix | DQN + opponent mix (as PPO mix), 0.82M steps, buffer 200k | 3 | 87.4% ± 8.4% | 17.6% ± 3.9% | 28.9% ± 6.2% | 2.2 | 11.4 | 32% |
 | v1_dqn_mix20k_best | DQN 20k, opponent mix 50/25/25 (best) | 1 | 94.2% | 30.0% | 35.4% | 1.8 | 12.0 | 16% |
 | v1_legacy_dqn20k | DQN 20k episodes, self-play (best) | 1 | 90.4% | 29.6% | 38.0% | 2.4 | 12.6 | 55% |
 | v1_legacy_dqn20k_double | Double DQN 20k (best) | 1 | 91.6% | 30.2% | 34.4% | 2.0 | 11.2 | 14% |
