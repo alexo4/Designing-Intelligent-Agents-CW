@@ -231,7 +231,11 @@ python train.py dqn --episodes 3000 --seed 0 --out-dir runs/dqn_s0
 python train.py ppo --hp LR=1e-4 --hp EPOCHS=8 --seed 0 --out-dir runs/ppo_lr1e-4_s0
 
 # Train both algorithms on seeds 0, 1 and 2, then plot the learning curves
-bash scripts/run_baselines.sh
+for s in 0 1 2; do
+  python train.py ppo --updates 300 --seed $s --out-dir runs/ppo_s$s &
+  python train.py dqn --episodes 3000 --seed $s --out-dir runs/dqn_s$s &
+  wait
+done
 python plot.py runs/*/ --out results/learning_curves.png
 
 # Evaluate: first policy plays blue, second plays red (--swap alternates sides)
@@ -254,7 +258,6 @@ dodgeball/
     dqn.py        DQN network + trainer
     ppo.py        PPO network + trainer
 tests/            pytest suite: game rules, rewards, policies, opponent mixing
-scripts/          run_baselines.sh: multi-seed training
 train.py          training entry point, with periodic evaluation
 evaluate.py       head-to-head evaluation (random / heuristic / dqn / ppo)
 plot.py           learning curves across seeds
